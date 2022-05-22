@@ -149,9 +149,6 @@ class ImportPrice(bpy.types.Operator):
         props = context.scene.price_importer_properties
         cost_props = context.scene.BIMCostProperties
         
-        #cost_type = "FIXED"
-        #category = None
-        
         parent = file.by_id(cost_props.cost_items[cost_props.active_cost_item_index].ifc_definition_id)
         
         cost_props.cost_items[cost_props.active_cost_item_index].identification = PriceData[props.my_identification]
@@ -163,18 +160,6 @@ class ImportPrice(bpy.types.Operator):
         ifc.run("cost.edit_cost_value", cost_value = value, attributes = attributes)
         
         Data.load(file)
-        
-        #
-        #
-        #
-        #
-
-        #
-        #
-        #
-        #TODO unit monetary measure
-        #
-        #
         
         props.my_price_status = "Importato"
         return {'FINISHED'}
