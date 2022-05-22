@@ -4,6 +4,7 @@ import textwrap
 import blenderbim.tool as tool
 from pathlib import Path
 from ifcopenshell.api.cost.data import Data
+from blenderbim.bim.ifc import IfcStore
 
 my_columns_enum = []
 PriceData = {}
@@ -106,7 +107,9 @@ class _PT_PriceImporter(bpy.types.Panel):
         
         self.layout.operator(ImportPrice.bl_idname, text = "Import price", icon = "IMPORT")
         
-        cost_props = context.scene.BIMCostProperties
+        
+        
+        #cost_props = context.scene.BIMCostProperties
         
         #row = layout.row()
         #row.prop(props, "my_price_status")
@@ -131,12 +134,28 @@ class SearchPrice(bpy.types.Operator):
             for row in csv_reader:
                 if row[props.my_column] == props.my_searching_value:
                     PriceData = row
+                    PriceData[props.my_cost_value] = PriceData[props.my_cost_value].replace(",", "")
                     price_exists = True
                         
         return {"FINISHED"}
 
 def UpdateMySearchingValue(self, context):
     SearchPrice.execute(self, context)
+
+def GetIfcQuantityFromUMI(UMI):
+    quantities = {
+        "m²" : "IfcQuantityArea",
+        "n" : "IfcQuantityCount",
+        "m" : "IfcQuantityLength",
+        "h" : "IfcQuantityTime",
+        "m³" : "IfcQuantityVolume",
+        "kg" : "IfcQuantityWeight",
+        }
+    
+    if UMI in quantities.keys():
+        return quantities[UMI]
+    else:
+        return
         
 class ImportPrice(bpy.types.Operator):
     bl_idname = "object.import_price"
@@ -149,13 +168,23 @@ class ImportPrice(bpy.types.Operator):
         props = context.scene.price_importer_properties
         cost_props = context.scene.BIMCostProperties
         
-        parent = file.by_id(cost_props.cost_items[cost_props.active_cost_item_index].ifc_definition_id)
+        cost_item_ifcid = file.by_id(cost_props.cost_items[cost_props.active_cost_item_index].ifc_definition_id)
         
         cost_props.cost_items[cost_props.active_cost_item_index].identification = PriceData[props.my_identification]
         cost_props.cost_items[cost_props.active_cost_item_index].name = PriceData[props.my_name]
+
+        ifc_quantity_class = GetIfcQuantityFromUMI(PriceData["UMI"])
+        
+        if ifc_quantity_class:
+            ifc.run("cost.add_cost_item_quantity",
+                cost_item = cost_item_ifcid,
+                ifc_class = ifc_quantity_class,
+                )
+        else:
+            print("Didn't found measure unit, sorry")
         
         attributes = {"AppliedValue" : float(PriceData[props.my_cost_value][:-2])}
-        value = ifc.run("cost.add_cost_value", parent=parent)
+        value = ifc.run("cost.add_cost_value", parent = cost_item_ifcid)
         
         ifc.run("cost.edit_cost_value", cost_value = value, attributes = attributes)
         
